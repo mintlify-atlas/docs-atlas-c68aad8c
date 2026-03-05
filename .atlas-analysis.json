@@ -1,0 +1,50 @@
+{
+  "projectType": "api-service",
+  "projectName": "LoL Tracker Backend",
+  "projectDescription": "A REST API for tracking League of Legends player statistics, ranks, and match history using the Riot Games API",
+  "theme": "palm",
+  "primaryColor": "#7c7c7c",
+  "lightColor": "#c8c8c8",
+  "darkColor": "#070707",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Guides",
+            "pages": ["guides/setup", "guides/configuration", "guides/authentication"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Endpoints",
+            "pages": ["api/overview", "api/player", "api/match-history"]
+          },
+          {
+            "group": "Resources",
+            "pages": ["api/response-codes", "api/rate-limits"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Fetch player profile data including rank, level, and profile icon",
+    "Retrieve ranked Solo/Duo statistics with LP and winrate calculation",
+    "Query paginated match history with detailed game information",
+    "Access complete match details with all 10 players, KDA, items, and team scores",
+    "Support for multiple queue types including Ranked, Normal, ARAM, and Clash"
+  ],
+  "publicApiSurface": [
+    "GET /api/jugador/:nombre/:tag - Fetch player profile and ranked statistics",
+    "GET /api/historial/:nombre/:tag?inicio=0&cantidad=10 - Retrieve paginated match history"
+  ]
+}
