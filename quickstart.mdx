@@ -1,80 +1,314 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart Guide'
+description: 'Get the LoL Tracker Backend API running in minutes'
+icon: 'rocket'
 ---
 
-## Get started in three steps
+Get your LoL Tracker Backend up and running in just a few minutes. This guide will walk you through cloning the repository, setting up your environment, and making your first API calls.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
+
+- **Node.js** (v14 or higher) installed on your machine
+- **npm** package manager
+- A **Riot Games Developer API Key** (we'll show you how to get one)
+
+<Tip>
+If you don't have Node.js installed, download it from [nodejs.org](https://nodejs.org/)
+</Tip>
+
+## Setup Process
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the LoL Tracker Backend repository to your local machine:
+
+    ```bash
+    git clone https://github.com/ValentinSetti/tracker-lol-backend.git
+    cd tracker-lol-backend
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required npm packages:
+
+    ```bash
+    npm install
+    ```
+
+    This will install:
+    - **express** (v5.2.1) - Web server framework
+    - **axios** (v1.13.5) - HTTP client for Riot API requests
+    - **cors** (v2.8.6) - Enable cross-origin requests
+    - **dotenv** (v17.3.1) - Environment variable management
+  </Step>
+
+  <Step title="Get Your Riot API Key">
+    To access Riot Games data, you need a developer API key:
+
+    1. Visit [developer.riotgames.com](https://developer.riotgames.com/)
+    2. Sign in with your Riot Games account
+    3. Navigate to your dashboard
+    4. Copy your **Development API Key**
+
+    <Warning>
+    Development API keys expire after 24 hours and have rate limits. For production use, you'll need to apply for a production key.
+    </Warning>
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the root directory of the project:
+
+    ```bash
+    touch .env
+    ```
+
+    Add your Riot API key to the `.env` file:
+
+    ```bash .env
+    RIOT_API_KEY=your_riot_api_key_here
+    ```
+
+    <Note>
+    The `.env` file is gitignored by default to keep your API key secure. Never commit this file to version control.
+    </Note>
+  </Step>
+
+  <Step title="Start the Server">
+    Launch the development server:
+
+    ```bash
+    node index.js
+    ```
+
+    You should see:
+    ```
+    Servidor corriendo en http://localhost:3000
+    ```
+
+    The API is now running on port 3000!
+  </Step>
+
+  <Step title="Verify the Server">
+    Test that the server is running by visiting the root endpoint:
+
+    ```bash
+    curl http://localhost:3000
+    ```
+
+    Expected response:
+    ```
+    ¡El servidor del LoL Tracker está vivo, Guillote!
+    ```
+  </Step>
+</Steps>
+
+## Making Your First API Calls
+
+Now that your server is running, let's test the two main endpoints with real API calls.
+
+### Get Player Information
+
+Retrieve a player's rank, level, and profile information:
+
+<CodeGroup>
+
+```bash cURL
+curl http://localhost:3000/api/jugador/HideOnBush/KR1
+```
+
+```javascript JavaScript (fetch)
+fetch('http://localhost:3000/api/jugador/HideOnBush/KR1')
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+```javascript JavaScript (axios)
+const axios = require('axios');
+
+axios.get('http://localhost:3000/api/jugador/HideOnBush/KR1')
+  .then(response => console.log(response.data));
+```
+
+</CodeGroup>
+
+**Example Response:**
+
+```json
+{
+  "userTier": "CHALLENGER",
+  "userRank": "I",
+  "userLps": 1247,
+  "userWins": 145,
+  "userLosses": 98,
+  "userLevel": 387,
+  "userPic": 4568,
+  "userId": "abc123-def456-ghi789..."
+}
+```
+
+<Tip>
+Replace `HideOnBush/KR1` with any valid Riot ID in the format `gameName/tagLine`
+</Tip>
+
+### Get Match History
+
+Retrieve a player's recent match history with pagination:
+
+<CodeGroup>
+
+```bash cURL (Default)
+curl http://localhost:3000/api/historial/HideOnBush/KR1
+```
+
+```bash cURL (With Pagination)
+curl "http://localhost:3000/api/historial/HideOnBush/KR1?inicio=0&cantidad=5"
+```
+
+```javascript JavaScript (fetch)
+fetch('http://localhost:3000/api/historial/HideOnBush/KR1?inicio=0&cantidad=5')
+  .then(response => response.json())
+  .then(data => console.log(data));
+```
+
+</CodeGroup>
+
+**Query Parameters:**
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `inicio` | number | 0 | Starting index for pagination |
+| `cantidad` | number | 10 | Number of matches to retrieve |
+
+**Example Response:**
+
+```json
+[
+  {
+    "duracion": "28:45",
+    "cola": "Clasificatoria Solo/Dúo",
+    "campeon": "Zed",
+    "estado": true,
+    "k": 12,
+    "d": 3,
+    "a": 8,
+    "jugadoresPartida": [
+      {
+        "nombre": "PlayerOne",
+        "tag": "NA1",
+        "equipo": 100,
+        "campeon": "Ahri",
+        "estado": true,
+        "k": 8,
+        "d": 5,
+        "a": 15,
+        "items": [3089, 3157, 3116, 3135, 3020, 0, 3364]
+      }
+      // ... 9 more players
+    ],
+    "killsRed": 18,
+    "deathRed": 32,
+    "assistsRed": 45,
+    "killsBlue": 32,
+    "deathsBlue": 18,
+    "assistsBlue": 68
+  }
+  // ... more matches
+]
+```
+
+## Response Field Reference
+
+### Player Endpoint (`/api/jugador/:nombre/:tag`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `userTier` | string | Rank tier (IRON, BRONZE, SILVER, GOLD, PLATINUM, DIAMOND, MASTER, GRANDMASTER, CHALLENGER, or UNRANKED) |
+| `userRank` | string | Division within tier (I, II, III, IV) - empty for UNRANKED |
+| `userLps` | number | League Points (LP) in current division |
+| `userWins` | number | Total ranked wins in current season |
+| `userLosses` | number | Total ranked losses in current season |
+| `userLevel` | number | Summoner level |
+| `userPic` | number | Profile icon ID |
+| `userId` | string | Player's unique PUUID |
+
+### Match History Endpoint (`/api/historial/:nombre/:tag`)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `duracion` | string | Match duration in MM:SS format |
+| `cola` | string | Queue type (e.g., "Clasificatoria Solo/Dúo", "ARAM") |
+| `campeon` | string | Champion played by the queried player |
+| `estado` | boolean | Whether the queried player won (true) or lost (false) |
+| `k` | number | Kills by the queried player |
+| `d` | number | Deaths by the queried player |
+| `a` | number | Assists by the queried player |
+| `jugadoresPartida` | array | Array of all 10 players in the match |
+| `killsRed` | number | Total kills by red team |
+| `deathRed` | number | Total deaths by red team |
+| `assistsRed` | number | Total assists by red team |
+| `killsBlue` | number | Total kills by blue team |
+| `deathsBlue` | number | Total deaths by blue team |
+| `assistsBlue` | number | Total assists by blue team |
+
+## Supported Queue Types
+
+The API translates Riot's queue IDs to human-readable names:
+
+| Queue ID | Display Name |
+|----------|--------------|
+| 420 | Clasificatoria Solo/Dúo |
+| 400 | Normal Reclutamiento |
+| 430 | Normal Selección Oculta |
+| 440 | Clasificatoria Flexible |
+| 450 | ARAM |
+| 700 | Clash |
+| Other | Otro Modo |
+
+## Troubleshooting
 
 <AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+  <Accordion title="Error: 403 Forbidden from Riot API">
+    This usually means your API key is invalid or expired. Development API keys expire after 24 hours.
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
+    **Solution:** Get a fresh API key from [developer.riotgames.com](https://developer.riotgames.com/) and update your `.env` file.
   </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+
+  <Accordion title="Error: 404 Player Not Found">
+    The player name and tag combination doesn't exist.
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
+    **Solution:** Verify the exact spelling and tag. Riot IDs are case-sensitive for the game name but tags are always uppercase.
+  </Accordion>
+
+  <Accordion title="Error: 429 Rate Limit Exceeded">
+    You've made too many requests. Development API keys have strict rate limits:
+    - 20 requests per second
+    - 100 requests per 2 minutes
+    
+    **Solution:** Implement request throttling or apply for a production API key with higher limits.
+  </Accordion>
+
+  <Accordion title="Server won't start / Port 3000 in use">
+    Another application is using port 3000.
+    
+    **Solution:** Either stop the other application or change the port in `index.js` by modifying the `PORT` constant (line 7).
   </Accordion>
 </AccordionGroup>
 
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
-
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
-
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 3: Go live
-
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
-
-## Next steps
-
-Now that you have your docs running, explore these key features:
+## Next Steps
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Explore detailed documentation for all endpoints
+  </Card>
+  <Card title="Configuration Guide" icon="gear" href="/guides/configuration">
+    Learn about server configuration and environment variables
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Set up and manage your Riot API key
+  </Card>
+  <Card title="Rate Limits" icon="gauge" href="/api/rate-limits">
+    Handle Riot API rate limits effectively
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

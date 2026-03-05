@@ -1,0 +1,167 @@
+---
+title: 'Get Player Statistics'
+description: 'Retrieve ranked statistics and profile information for a League of Legends player'
+api: 'GET /api/jugador/:nombre/:tag'
+---
+
+## Endpoint
+
+```
+GET /api/jugador/:nombre/:tag
+```
+
+Retrieves Solo/Duo ranked queue statistics, summoner level, profile icon, and PUUID for a specified player.
+
+## Path Parameters
+
+<ParamField path="nombre" type="string" required>
+  The player's Riot ID name (game name without the tag)
+  
+  **Example:** `HideOnBush` for player "HideOnBush#KR1"
+</ParamField>
+
+<ParamField path="tag" type="string" required>
+  The player's Riot ID tagline (without the # symbol)
+  
+  **Example:** `KR1` for player "HideOnBush#KR1"
+</ParamField>
+
+## Implementation Details
+
+The endpoint performs three sequential API calls to Riot Games:
+
+1. **Account Lookup** (`index.js:26-29`): Fetches PUUID using Riot ID
+   - Endpoint: `americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{nombre}/{tag}`
+
+2. **Summoner Profile** (`index.js:34-37`): Retrieves summoner level and profile icon
+   - Endpoint: `la2.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}`
+
+3. **Ranked Stats** (`index.js:43-46`): Gets league entries for all queues
+   - Endpoint: `la2.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}`
+
+### Solo/Duo Queue Filtering
+
+The endpoint filters the ranked data to return only Solo/Duo queue statistics (`index.js:50`):
+
+```javascript
+const soloQ = rank.data.find(cola => cola.queueType === "RANKED_SOLO_5x5");
+```
+
+If the player has no Solo/Duo ranked data, default values are returned for unranked players.
+
+## Response
+
+<ResponseField name="userTier" type="string">
+  The player's ranked tier. Possible values: `IRON`, `BRONZE`, `SILVER`, `GOLD`, `PLATINUM`, `EMERALD`, `DIAMOND`, `MASTER`, `GRANDMASTER`, `CHALLENGER`, or `UNRANKED` if not ranked.
+</ResponseField>
+
+<ResponseField name="userRank" type="string">
+  The player's division within their tier. Values: `I`, `II`, `III`, `IV`, or empty string if unranked.
+</ResponseField>
+
+<ResponseField name="userLps" type="number">
+  League Points (LP). Returns `0` if unranked.
+</ResponseField>
+
+<ResponseField name="userWins" type="number">
+  Total wins in Solo/Duo queue. Returns `0` if unranked.
+</ResponseField>
+
+<ResponseField name="userLosses" type="number">
+  Total losses in Solo/Duo queue. Returns `0` if unranked.
+</ResponseField>
+
+<ResponseField name="userLevel" type="number">
+  Summoner level (account level).
+</ResponseField>
+
+<ResponseField name="userPic" type="number">
+  Profile icon ID. Can be used to construct the icon image URL.
+</ResponseField>
+
+<ResponseField name="userId" type="string">
+  The player's PUUID (Riot Universal Unique Identifier).
+</ResponseField>
+
+## Examples
+
+### Request - Ranked Player
+
+```bash
+curl http://localhost:3000/api/jugador/Faker/KR1
+```
+
+### Response - Ranked Player
+
+```json
+{
+  "userTier": "PLATINUM",
+  "userRank": "II",
+  "userLps": 67,
+  "userWins": 145,
+  "userLosses": 132,
+  "userLevel": 342,
+  "userPic": 4928,
+  "userId": "abc123-def456-ghi789-jkl012-mno345"
+}
+```
+
+### Request - Unranked Player
+
+```bash
+curl http://localhost:3000/api/jugador/NewPlayer/NA1
+```
+
+### Response - Unranked Player
+
+```json
+{
+  "userTier": "UNRANKED",
+  "userRank": "",
+  "userLps": 0,
+  "userWins": 0,
+  "userLosses": 0,
+  "userLevel": 30,
+  "userPic": 29,
+  "userId": "xyz987-uvw654-rst321-pqr098-nml765"
+}
+```
+
+## Error Responses
+
+### Player Not Found / API Error
+
+**Status Code:** `500`
+
+```json
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+**Common causes:**
+- Invalid Riot ID (nombre/tag combination doesn't exist)
+- Riot API is down or rate limited
+- Invalid API key
+- Network connectivity issues
+
+## Code Reference
+
+The complete implementation can be found in `index.js:18-68`.
+
+## Notes
+
+<Note>
+**Queue Type Specificity:** This endpoint returns ONLY Solo/Duo ranked statistics. It does not include Flexible queue, Normal games, or other queue types.
+</Note>
+
+<Info>
+**Profile Icon Usage:** The `userPic` field contains the icon ID. To display the icon, use the Riot Data Dragon URL:
+```
+https://ddragon.leagueoflegends.com/cdn/{version}/img/profileicon/{userPic}.png
+```
+</Info>
+
+<Warning>
+**Unranked Detection:** Players who haven't played any Solo/Duo ranked games will have `userTier: "UNRANKED"` with all stats set to `0` or empty strings.
+</Warning>

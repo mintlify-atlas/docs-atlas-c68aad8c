@@ -1,0 +1,298 @@
+---
+title: "Response Codes & Error Handling"
+description: "Understand HTTP status codes and error responses in the LoL Tracker API"
+---
+
+## HTTP Status Codes
+
+The LoL Tracker API uses standard HTTP status codes to indicate the success or failure of requests.
+
+### Success Responses
+
+| Status Code | Description | When It Occurs |
+|-------------|-------------|----------------|
+| `200 OK` | Successful request | Data retrieved successfully from both player and match history endpoints |
+
+### Error Responses
+
+| Status Code | Description | When It Occurs |
+|-------------|-------------|----------------|
+| `500 Internal Server Error` | Server-side error | Issues communicating with Riot API, invalid player name/tag, or API key problems |
+
+<Note>
+The API currently uses a catch-all 500 error response for all failure scenarios. This simplifies error handling but means you'll need to check the error message for specific details.
+</Note>
+
+## Response Formats
+
+### Success Response Structure
+
+When a request succeeds, you'll receive a `200` status code with a JSON response body.
+
+**Player endpoint** (`/api/jugador/:nombre/:tag`):
+
+```json
+{
+  "userTier": "GOLD",
+  "userRank": "II",
+  "userLps": 45,
+  "userWins": 87,
+  "userLosses": 81,
+  "userLevel": 142,
+  "userPic": 4923,
+  "userId": "abc123def456..."
+}
+```
+
+**Match history endpoint** (`/api/historial/:nombre/:tag`):
+
+```json
+[
+  {
+    "duracion": "32:45",
+    "cola": "Clasificatoria Solo/Dúo",
+    "campeon": "Jinx",
+    "estado": true,
+    "k": 12,
+    "d": 4,
+    "a": 8,
+    "jugadoresPartida": [...],
+    "killsRed": 18,
+    "deathRed": 35,
+    "assistsRed": 42,
+    "killsBlue": 35,
+    "deathsBlue": 18,
+    "assistsBlue": 71
+  }
+]
+```
+
+### Error Response Structure
+
+When a request fails, you'll receive a `500` status code with this JSON structure:
+
+```json
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+<Warning>
+Both endpoints return the same generic error message in Spanish: "Hubo un problema al buscar al jugador." (There was a problem searching for the player). Check server logs for specific error details.
+</Warning>
+
+## Common Error Scenarios
+
+### 1. Invalid Player Name or Tag
+
+**Cause**: The player name/tag combination doesn't exist in Riot's database.
+
+**What happens in the code**:
+- The initial Riot API call fails at `index.js:26-29` (player endpoint) or `index.js:76-83` (match history endpoint)
+- Error is caught and returns 500 status
+
+**How to handle**:
+```javascript
+try {
+  const response = await fetch('/api/jugador/InvalidPlayer/NA1');
+  if (!response.ok) {
+    // Player not found or other error
+    const error = await response.json();
+    console.error('Error:', error.error);
+  }
+} catch (err) {
+  console.error('Request failed:', err);
+}
+```
+
+### 2. Invalid or Expired API Key
+
+**Cause**: The `RIOT_API_KEY` environment variable is missing, invalid, or expired.
+
+**What happens in the code**:
+- Riot API rejects the request due to authentication failure
+- Error caught at `index.js:65-67` or `index.js:201-203`
+
+**How to handle**:
+- Verify your `.env` file contains a valid `RIOT_API_KEY`
+- Ensure the API key hasn't expired (Riot development keys expire after 24 hours)
+- Check the server console for detailed Riot API error messages
+
+### 3. Riot API Service Issues
+
+**Cause**: Riot's API is experiencing downtime or rate limiting.
+
+**What happens in the code**:
+- Any of the multiple `axios.get()` calls to Riot API fail
+- Error propagates to catch block
+
+**How to handle**:
+- Implement retry logic with exponential backoff
+- Check [Riot API Status](https://developer.riotgames.com/api-status/) page
+- Monitor rate limits (see [Rate Limits](/api/rate-limits) page)
+
+### 4. Match History Errors
+
+**Cause**: Invalid pagination parameters or issues fetching match details.
+
+**What happens in the code**:
+- The loop at `index.js:102-196` makes multiple API calls
+- If any single match detail fetch fails, the entire request fails
+
+**Example scenarios**:
+- Invalid `inicio` or `cantidad` query parameters
+- Match data temporarily unavailable
+- Rate limit exceeded during the loop
+
+<Accordion title="Why does the match history endpoint fail more often?">
+The match history endpoint makes **multiple sequential API calls** to Riot:
+1. One call to get the player's PUUID (`index.js:76-83`)
+2. One call to get match IDs (`index.js:89-96`)
+3. **One call per match** to get detailed match data (`index.js:104-107`)
+
+If you request 10 matches, that's **12 total API calls**. Each call is a potential failure point, and they all count against your rate limit.
+</Accordion>
+
+## Debugging Errors
+
+The backend logs detailed error information to the console that isn't exposed to the client.
+
+### Server-Side Logging
+
+When the match history endpoint fails, check the server console for:
+
+```bash
+Error consultando a Riot: [detailed error info]
+```
+
+This log statement (`index.js:202`) includes:
+- The full Riot API error response (`error.response?.data`)
+- Or the error message if the response isn't available
+
+### Request Tracking
+
+Every player search logs this to the console:
+
+```bash
+--- NUEVA BÚSQUEDA: PlayerName #TAG ---
+```
+
+This appears at `index.js:23` and helps you track which requests are being processed.
+
+## Best Practices
+
+<Note>
+**Always implement client-side error handling** for all API requests, even if you expect them to succeed.
+</Note>
+
+1. **Check response status codes**
+   ```javascript
+   if (!response.ok) {
+     const error = await response.json();
+     // Handle error.error message
+   }
+   ```
+
+2. **Implement timeouts**
+   - Match history requests can take several seconds due to multiple API calls
+   - Set appropriate timeout values (recommended: 30+ seconds)
+
+3. **Validate input before sending**
+   - Ensure player names and tags are properly formatted
+   - Validate `inicio` and `cantidad` parameters are positive integers
+
+4. **Cache successful responses**
+   - Player stats don't change instantly
+   - Match history is immutable once games complete
+   - Reduces errors from rate limiting
+
+5. **Monitor server logs**
+   - The generic client error message hides important details
+   - Server console shows the actual Riot API error responses
+
+## Error Response Examples
+
+### Player Not Found
+
+**Request**:
+```bash
+GET /api/jugador/FakePlayer99999/NA1
+```
+
+**Response**:
+```json
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+**Server console** (index.js:202):
+```
+Error consultando a Riot: {
+  status: 404,
+  message: "Data not found"
+}
+```
+
+### API Key Error
+
+**Request**:
+```bash
+GET /api/jugador/Doublelift/NA1
+```
+
+**Response**:
+```json
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+**Server console**:
+```
+Error consultando a Riot: {
+  status: 403,
+  message: "Forbidden"
+}
+```
+
+### Rate Limit Exceeded
+
+**Request**:
+```bash
+GET /api/historial/Faker/KR1?cantidad=20
+```
+
+**Response**:
+```json
+HTTP/1.1 500 Internal Server Error
+Content-Type: application/json
+
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+**Server console**:
+```
+Error consultando a Riot: {
+  status: 429,
+  message: "Rate limit exceeded"
+}
+```
+
+<Warning>
+All three error scenarios return the **same 500 response** to the client. You must check server logs to determine the actual cause.
+</Warning>
+
+## Related Resources
+
+- [Rate Limits](/api/rate-limits) - Understanding API rate limits and how to stay within them
+- [Player Endpoint](/api/player) - Using the player stats endpoint
+- [Match History Endpoint](/api/match-history) - Using the match history endpoint with pagination

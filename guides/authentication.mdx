@@ -1,0 +1,452 @@
+---
+title: "Riot API Authentication"
+description: "Complete guide to obtaining, configuring, and using Riot Games API keys with the LoL Tracker Backend"
+icon: "key"
+---
+
+## Overview
+
+The LoL Tracker Backend authenticates with the Riot Games API using an API key passed via the `X-Riot-Token` header. This guide covers everything you need to know about obtaining, configuring, and using Riot API authentication.
+
+## Obtaining a Riot Games API Key
+
+<Steps>
+  <Step title="Create a Riot Games Account">
+    If you don't already have one, create a Riot Games account at [https://signup.leagueoflegends.com](https://signup.leagueoflegends.com)
+  </Step>
+
+  <Step title="Access the Developer Portal">
+    Navigate to the [Riot Developer Portal](https://developer.riotgames.com/) and sign in with your Riot account.
+  </Step>
+
+  <Step title="Generate a Development API Key">
+    Once logged in, you'll see your **Development API Key** on the dashboard.
+
+    <Note>
+      Development API keys are regenerated every 24 hours and have strict rate limits. They're perfect for testing and local development.
+    </Note>
+
+    Copy your API key - it should look like this:
+    ```
+    RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+    ```
+  </Step>
+
+  <Step title="Apply for a Production API Key (Optional)">
+    For production applications, you'll need to apply for a **Production API Key**:
+
+    1. Click on "Apps" in the developer portal
+    2. Register a new application
+    3. Fill out the application form with:
+       - Application name
+       - Description of your use case
+       - Expected API usage
+    4. Wait for Riot to review and approve your application
+
+    <Warning>
+      Production keys have higher rate limits but require approval. Development keys are sufficient for local testing.
+    </Warning>
+  </Step>
+</Steps>
+
+## Configuring the API Key
+
+### Environment Variable Setup
+
+The LoL Tracker Backend loads the API key from a `.env` file using the **dotenv** package.
+
+<CodeGroup>
+```bash .env
+RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+```javascript index.js (Loading)
+require('dotenv').config();
+const apiKey = process.env.RIOT_API_KEY;
+```
+</CodeGroup>
+
+### How the API Key is Used
+
+The API key is included in every request to the Riot Games API via the `X-Riot-Token` header:
+
+```javascript index.js
+const apiKey = process.env.RIOT_API_KEY;
+
+// Example: Fetching player account data
+const usuario = await axios.get(
+    `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombre}/${tag}`,
+    { headers: { 'X-Riot-Token': apiKey } }
+);
+```
+
+**All API endpoints use this same authentication pattern:**
+
+<Accordion title="Player Stats Endpoint (index.js:18-68)">
+```javascript index.js
+app.get('/api/jugador/:nombre/:tag', async (req, res) => {
+    try {
+        const { nombre, tag } = req.params;
+        const apiKey = process.env.RIOT_API_KEY;
+
+        // Fetch account data
+        const usuario = await axios.get(
+            `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombre}/${tag}`,
+            { headers: { 'X-Riot-Token': apiKey } }
+        );
+        const miPuuid = usuario.data.puuid;
+
+        // Fetch summoner profile
+        const perfil = await axios.get(
+            `https://la2.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${miPuuid}`,
+            { headers: { 'X-Riot-Token': apiKey } }
+        );
+
+        // Fetch ranked data
+        const rank = await axios.get(
+            `https://la2.api.riotgames.com/lol/league/v4/entries/by-puuid/${miPuuid}`,
+            { headers: { 'X-Riot-Token': apiKey } }
+        );
+
+        // ... process and return data
+    } catch (error) {
+        res.status(500).json({ error: 'Hubo un problema al buscar al jugador.' });
+    }
+});
+```
+</Accordion>
+
+<Accordion title="Match History Endpoint (index.js:71-206)">
+```javascript index.js
+app.get('/api/historial/:nombre/:tag', async (req, res) => {
+    try {
+        const {nombre, tag} = req.params;
+        const apiKey = process.env.RIOT_API_KEY;
+
+        // Fetch account PUUID
+        const respuesta = await axios.get(
+            `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombre}/${tag}`,
+            { headers: { 'X-Riot-Token': apiKey } }
+        )
+
+        const miPuuid = respuesta.data.puuid;
+
+        // Fetch match history
+        const historialCompleto = await axios.get(
+            `https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/${miPuuid}/ids?start=${variableInicio}&count=${variableCantidad}`,
+            { headers: { 'X-Riot-Token': apiKey } }
+        )
+
+        // Fetch details for each match
+        for(const partida of historial) {
+            const detallePartida = await axios.get(
+                `https://americas.api.riotgames.com/lol/match/v5/matches/${partida}`, 
+                { headers: { 'X-Riot-Token': apiKey } }
+            );
+            // ... process match data
+        }
+
+        res.json(historialRevisado);
+    } catch(error) {
+        console.error("Error consultando a Riot:", error.response?.data || error.message);
+        res.status(500).json({ error: 'Hubo un problema al buscar al jugador.' });
+    }
+});
+```
+</Accordion>
+
+## Rate Limiting
+
+Riot Games enforces strict rate limits on API requests to prevent abuse.
+
+### Development API Key Limits
+
+<Info>
+  **Development keys** have the following rate limits:
+  - **20 requests per second**
+  - **100 requests per 2 minutes**
+  
+  These limits are per API key, not per endpoint.
+</Info>
+
+### Production API Key Limits
+
+<Info>
+  **Production keys** have higher limits that vary based on your application's needs:
+  - Typically **500-3000 requests per second**
+  - Custom limits negotiated during application approval
+</Info>
+
+### Handling Rate Limit Errors
+
+When you exceed rate limits, the Riot API returns a `429 Too Many Requests` response:
+
+```javascript
+try {
+    const response = await axios.get(url, { headers: { 'X-Riot-Token': apiKey } });
+} catch (error) {
+    if (error.response?.status === 429) {
+        console.log('Rate limit exceeded. Retry after:', error.response.headers['retry-after']);
+        // Implement retry logic here
+    }
+}
+```
+
+<Warning>
+  The current implementation in `index.js` does not handle rate limiting. For production use, implement retry logic with exponential backoff.
+</Warning>
+
+### Rate Limiting Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Implement Caching" icon="database">
+    Cache frequently requested data (player stats, match history) to reduce API calls:
+    
+    ```javascript
+    const NodeCache = require('node-cache');
+    const cache = new NodeCache({ stdTTL: 300 }); // 5 minute cache
+    
+    const cachedData = cache.get(cacheKey);
+    if (cachedData) return cachedData;
+    ```
+  </Card>
+  
+  <Card title="Batch Requests" icon="layer-group">
+    Group multiple requests together when possible to minimize API calls.
+  </Card>
+  
+  <Card title="Monitor Usage" icon="chart-line">
+    Track your API usage to stay within rate limits:
+    
+    ```javascript
+    let requestCount = 0;
+    setInterval(() => {
+      console.log(`Requests in last minute: ${requestCount}`);
+      requestCount = 0;
+    }, 60000);
+    ```
+  </Card>
+  
+  <Card title="Implement Retry Logic" icon="rotate">
+    Use exponential backoff when rate limited:
+    
+    ```javascript
+    async function retryRequest(fn, maxRetries = 3) {
+      for (let i = 0; i < maxRetries; i++) {
+        try {
+          return await fn();
+        } catch (error) {
+          if (error.response?.status === 429 && i < maxRetries - 1) {
+            await new Promise(r => setTimeout(r, 2 ** i * 1000));
+          } else throw error;
+        }
+      }
+    }
+    ```
+  </Card>
+</CardGroup>
+
+## Security Best Practices
+
+<Warning>
+  **Never expose your API key in client-side code, public repositories, or logs.**
+</Warning>
+
+### DO: Secure Practices
+
+<AccordionGroup>
+  <Accordion title="Store in environment variables" icon="check">
+    Always use `.env` files for local development:
+    
+    ```bash .env
+    RIOT_API_KEY=RGAPI-your-key-here
+    ```
+    
+    The project includes `.env` in `.gitignore` to prevent accidental commits:
+    
+    ```bash .gitignore
+    # dotenv environment variable files
+    .env
+    .env.development.local
+    .env.test.local
+    .env.production.local
+    .env.local
+    ```
+  </Accordion>
+  
+  <Accordion title="Use different keys for dev/prod" icon="check">
+    Maintain separate API keys for development and production environments:
+    
+    - **Development**: Use regenerating 24-hour keys
+    - **Production**: Use approved production keys with monitoring
+  </Accordion>
+  
+  <Accordion title="Implement server-side proxy" icon="check">
+    The LoL Tracker Backend acts as a proxy between your frontend and Riot API:
+    
+    ```
+    Frontend → Backend (with API key) → Riot API
+    ```
+    
+    This keeps the API key secure on the server, never exposed to clients.
+  </Accordion>
+  
+  <Accordion title="Rotate keys regularly" icon="check">
+    For production applications:
+    - Rotate API keys periodically
+    - Have a key rotation plan in case of compromise
+    - Monitor for unauthorized usage
+  </Accordion>
+</AccordionGroup>
+
+### DON'T: Insecure Practices
+
+<AccordionGroup>
+  <Accordion title="❌ Hardcode API keys in source code" icon="xmark">
+    ```javascript
+    // ❌ NEVER DO THIS
+    const apiKey = 'RGAPI-12345678-1234-1234-1234-123456789012';
+    ```
+  </Accordion>
+  
+  <Accordion title="❌ Commit .env files to Git" icon="xmark">
+    ```bash
+    # ❌ NEVER DO THIS
+    git add .env
+    git commit -m "Add environment variables"
+    ```
+    
+    The `.gitignore` file already prevents this, but double-check before committing.
+  </Accordion>
+  
+  <Accordion title="❌ Expose keys in client-side JavaScript" icon="xmark">
+    ```javascript
+    // ❌ NEVER DO THIS IN FRONTEND CODE
+    fetch('https://americas.api.riotgames.com/...', {
+      headers: { 'X-Riot-Token': 'RGAPI-...' }
+    });
+    ```
+    
+    Always proxy through your backend server instead.
+  </Accordion>
+  
+  <Accordion title="❌ Log API keys" icon="xmark">
+    ```javascript
+    // ❌ NEVER DO THIS
+    console.log('Using API key:', process.env.RIOT_API_KEY);
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Authentication
+
+Verify your API key is working correctly:
+
+<Steps>
+  <Step title="Test with a simple request">
+    Start your server and make a request to a known player:
+    
+    ```bash
+    curl http://localhost:3000/api/jugador/Faker/KR1
+    ```
+  </Step>
+  
+  <Step title="Check for authentication errors">
+    Common authentication error responses:
+    
+    **401 Unauthorized**: Invalid or expired API key
+    ```json
+    {
+      "status": {
+        "status_code": 401,
+        "message": "Unauthorized"
+      }
+    }
+    ```
+    
+    **403 Forbidden**: API key doesn't have required permissions
+    ```json
+    {
+      "status": {
+        "status_code": 403,
+        "message": "Forbidden"
+      }
+    }
+    ```
+  </Step>
+  
+  <Step title="Monitor server logs">
+    The server logs each request:
+    
+    ```javascript index.js:23
+    console.log(`\n--- NUEVA BÚSQUEDA: ${nombre} #${tag} ---`);
+    ```
+    
+    Watch for errors in the console to debug authentication issues.
+  </Step>
+</Steps>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="API key not found error">
+    **Error**: `Cannot read property of undefined (reading 'RIOT_API_KEY')`
+    
+    **Solutions**:
+    1. Ensure `.env` file exists in project root
+    2. Verify `require('dotenv').config()` is called at the top of `index.js`
+    3. Check `.env` file contains: `RIOT_API_KEY=your_key_here`
+    4. Restart the server after modifying `.env`
+  </Accordion>
+  
+  <Accordion title="401 Unauthorized errors">
+    **Cause**: Invalid or expired API key
+    
+    **Solutions**:
+    1. Development keys expire every 24 hours - generate a new one
+    2. Copy the entire key including the `RGAPI-` prefix
+    3. Ensure no extra spaces or quotes in `.env` file
+    4. Verify you're logged into the correct Riot account
+  </Accordion>
+  
+  <Accordion title="429 Rate limit exceeded">
+    **Cause**: Too many requests in a short time period
+    
+    **Solutions**:
+    1. Implement caching for frequently accessed data
+    2. Add delays between requests
+    3. Apply for a production API key for higher limits
+    4. Implement request queuing with rate limiting
+  </Accordion>
+  
+  <Accordion title="CORS errors when testing">
+    **Cause**: Frontend trying to call Riot API directly
+    
+    **Solution**: Always proxy through the backend:
+    
+    ```javascript
+    // ✅ Correct - call your backend
+    fetch('http://localhost:3000/api/jugador/Faker/KR1')
+    
+    // ❌ Wrong - direct Riot API call from frontend
+    fetch('https://americas.api.riotgames.com/...')
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Overview" icon="code" href="/api/overview">
+    Explore all available endpoints and start making requests
+  </Card>
+  <Card title="Quick Start" icon="bolt" href="/quickstart">
+    Make your first API request in under 5 minutes
+  </Card>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Learn more about server configuration options
+  </Card>
+  <Card title="Riot API Docs" icon="book-open" href="https://developer.riotgames.com/docs/lol">
+    Official Riot Games API documentation
+  </Card>
+</CardGroup>

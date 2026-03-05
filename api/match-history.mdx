@@ -1,0 +1,352 @@
+---
+title: 'Get Match History'
+description: 'Fetch detailed match history with game statistics and participant information'
+api: 'GET /api/historial/:nombre/:tag'
+---
+
+## Endpoint
+
+```
+GET /api/historial/:nombre/:tag
+```
+
+Retrieves detailed match history for a player, including game duration, queue type, champion played, KDA, and full participant information for all players in each match.
+
+## Path Parameters
+
+<ParamField path="nombre" type="string" required>
+  The player's Riot ID name (game name without the tag)
+  
+  **Example:** `Faker` for player "Faker#KR1"
+</ParamField>
+
+<ParamField path="tag" type="string" required>
+  The player's Riot ID tagline (without the # symbol)
+  
+  **Example:** `KR1` for player "Faker#KR1"
+</ParamField>
+
+## Query Parameters
+
+<ParamField query="inicio" type="number" default="0">
+  The starting index for pagination (0-based). Determines which match to start from in the history.
+  
+  **Example:** `inicio=0` starts from the most recent match
+</ParamField>
+
+<ParamField query="cantidad" type="number" default="10">
+  The number of matches to retrieve. Maximum determined by Riot API limits.
+  
+  **Example:** `cantidad=5` returns 5 matches
+</ParamField>
+
+## Implementation Details
+
+The endpoint performs the following operations (`index.js:71-206`):
+
+1. **Account Lookup** (`index.js:76-83`): Retrieves PUUID from Riot ID
+2. **Match ID List** (`index.js:89-96`): Fetches match IDs with pagination
+3. **Match Details** (`index.js:102-107`): For each match ID, retrieves complete match data
+4. **Data Processing** (`index.js:109-196`):
+   - Formats match duration from seconds to `MM:SS`
+   - Translates queue IDs to readable names
+   - Extracts player statistics and item builds
+   - Calculates team totals (kills, deaths, assists) for both teams
+
+### Queue Type Dictionary
+
+The endpoint translates queue IDs to readable names (`index.js:116-123`):
+
+```javascript
+const diccionarioColas = {
+   420: "Clasificatoria Solo/Dúo",
+   400: "Normal Reclutamiento",
+   430: "Normal Selección Oculta",
+   440: "Clasificatoria Flexible",
+   450: "ARAM",
+   700: "Clash"
+}
+```
+
+Unknown queue types return `"Otro Modo"`.
+
+### Team ID System
+
+- **Team Blue:** `teamId = 100`
+- **Team Red:** `teamId = 200`
+
+## Response
+
+Returns an array of match objects, ordered from most recent to oldest.
+
+<ResponseField name="duracion" type="string">
+  Match duration in `MM:SS` format.
+  
+  **Example:** `"28:45"` for a 28 minute, 45 second game
+</ResponseField>
+
+<ResponseField name="cola" type="string">
+  Translated queue name. See queue dictionary above.
+  
+  **Examples:** `"Clasificatoria Solo/Dúo"`, `"ARAM"`, `"Otro Modo"`
+</ResponseField>
+
+<ResponseField name="campeon" type="string">
+  Champion name played by the requested player.
+  
+  **Example:** `"Ahri"`
+</ResponseField>
+
+<ResponseField name="estado" type="boolean">
+  Whether the requested player won the match.
+  
+  `true` = Victory, `false` = Defeat
+</ResponseField>
+
+<ResponseField name="k" type="number">
+  Kills by the requested player.
+</ResponseField>
+
+<ResponseField name="d" type="number">
+  Deaths by the requested player.
+</ResponseField>
+
+<ResponseField name="a" type="number">
+  Assists by the requested player.
+</ResponseField>
+
+<ResponseField name="killsRed" type="number">
+  Total kills by the Red team (teamId 200).
+</ResponseField>
+
+<ResponseField name="deathRed" type="number">
+  Total deaths by the Red team (teamId 200).
+</ResponseField>
+
+<ResponseField name="assistsRed" type="number">
+  Total assists by the Red team (teamId 200).
+</ResponseField>
+
+<ResponseField name="killsBlue" type="number">
+  Total kills by the Blue team (teamId 100).
+</ResponseField>
+
+<ResponseField name="deathsBlue" type="number">
+  Total deaths by the Blue team (teamId 100).
+</ResponseField>
+
+<ResponseField name="assistsBlue" type="number">
+  Total assists by the Blue team (teamId 100).
+</ResponseField>
+
+<ResponseField name="jugadoresPartida" type="array">
+  Array containing detailed information for all 10 players in the match.
+  
+  <Expandable title="Player Object Structure">
+    <ResponseField name="nombre" type="string">
+      Player's Riot ID game name.
+    </ResponseField>
+    
+    <ResponseField name="tag" type="string">
+      Player's Riot ID tagline.
+    </ResponseField>
+    
+    <ResponseField name="equipo" type="number">
+      Team ID. `100` for Blue team, `200` for Red team.
+    </ResponseField>
+    
+    <ResponseField name="campeon" type="string">
+      Champion name played by this player.
+    </ResponseField>
+    
+    <ResponseField name="estado" type="boolean">
+      Whether this player won the match. `true` = Victory, `false` = Defeat
+    </ResponseField>
+    
+    <ResponseField name="k" type="number">
+      Player's kills.
+    </ResponseField>
+    
+    <ResponseField name="d" type="number">
+      Player's deaths.
+    </ResponseField>
+    
+    <ResponseField name="a" type="number">
+      Player's assists.
+    </ResponseField>
+    
+    <ResponseField name="items" type="array">
+      Array of 7 item IDs (item0 through item6). `0` indicates an empty item slot.
+      
+      **Example:** `[3089, 3020, 3165, 3135, 0, 0, 3340]`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Examples
+
+### Request - Default Pagination
+
+```bash
+curl http://localhost:3000/api/historial/Faker/KR1
+```
+
+Retrieves the 10 most recent matches (default behavior).
+
+### Request - Custom Pagination
+
+```bash
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=5&cantidad=3"
+```
+
+Retrieves 3 matches starting from the 6th most recent match.
+
+### Request - First 20 Matches
+
+```bash
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=0&cantidad=20"
+```
+
+### Response Example
+
+```json
+[
+  {
+    "duracion": "28:45",
+    "cola": "Clasificatoria Solo/Dúo",
+    "campeon": "Ahri",
+    "estado": true,
+    "k": 12,
+    "d": 3,
+    "a": 8,
+    "killsRed": 15,
+    "deathRed": 32,
+    "assistsRed": 28,
+    "killsBlue": 32,
+    "deathsBlue": 15,
+    "assistsBlue": 65,
+    "jugadoresPartida": [
+      {
+        "nombre": "Faker",
+        "tag": "KR1",
+        "equipo": 100,
+        "campeon": "Ahri",
+        "estado": true,
+        "k": 12,
+        "d": 3,
+        "a": 8,
+        "items": [3089, 3020, 3165, 3135, 3157, 0, 3340]
+      },
+      {
+        "nombre": "Player2",
+        "tag": "KR1",
+        "equipo": 100,
+        "campeon": "Lee Sin",
+        "estado": true,
+        "k": 8,
+        "d": 4,
+        "a": 15,
+        "items": [6630, 3047, 3742, 3071, 3156, 3026, 3340]
+      },
+      {
+        "nombre": "Player3",
+        "tag": "NA1",
+        "equipo": 200,
+        "campeon": "Yasuo",
+        "estado": false,
+        "k": 5,
+        "d": 8,
+        "a": 6,
+        "items": [6673, 3006, 3031, 3033, 0, 0, 3340]
+      }
+      // ... 7 more players
+    ]
+  },
+  {
+    "duracion": "22:13",
+    "cola": "ARAM",
+    "campeon": "Zed",
+    "estado": false,
+    "k": 15,
+    "d": 12,
+    "a": 9,
+    "killsRed": 45,
+    "deathRed": 38,
+    "assistsRed": 92,
+    "killsBlue": 38,
+    "deathsBlue": 45,
+    "assistsBlue": 78,
+    "jugadoresPartida": [
+      // ... 10 players
+    ]
+  }
+  // ... more matches based on 'cantidad' parameter
+]
+```
+
+## Error Responses
+
+### Player Not Found / API Error
+
+**Status Code:** `500`
+
+```json
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+**Common causes:**
+- Invalid Riot ID (nombre/tag combination doesn't exist)
+- Riot API is down or rate limited
+- Invalid API key
+- Network connectivity issues
+- Match data unavailable
+
+## Pagination Examples
+
+### Retrieving All Matches (in batches)
+
+```bash
+# First 20 matches
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=0&cantidad=20"
+
+# Next 20 matches
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=20&cantidad=20"
+
+# Next 20 matches
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=40&cantidad=20"
+```
+
+### Retrieving Recent Matches Only
+
+```bash
+# 5 most recent matches
+curl "http://localhost:3000/api/historial/Faker/KR1?inicio=0&cantidad=5"
+```
+
+## Code Reference
+
+The complete implementation can be found in `index.js:71-206`.
+
+## Notes
+
+<Note>
+**Performance Consideration:** Each match requires a separate API call to Riot Games. Requesting a large number of matches (high `cantidad` value) will increase response time proportionally.
+</Note>
+
+<Info>
+**Item IDs:** The `items` array contains Riot item IDs. To display item images, use the Data Dragon URL:
+```
+https://ddragon.leagueoflegends.com/cdn/{version}/img/item/{itemId}.png
+```
+An item ID of `0` means the slot is empty.
+</Info>
+
+<Warning>
+**Team Totals Calculation:** The `killsRed`, `deathRed`, `assistsRed`, `killsBlue`, `deathsBlue`, and `assistsBlue` fields are calculated by summing individual player statistics from the `jugadoresPartida` array (see `index.js:164-176`).
+</Warning>
+
+<Tip>
+**Match Duration Format:** Duration is converted from seconds to `MM:SS` format. Seconds are zero-padded to always show two digits (e.g., `"5:03"` not `"5:3"`).
+</Tip>

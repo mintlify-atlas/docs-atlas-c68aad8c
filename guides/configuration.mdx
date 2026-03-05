@@ -1,0 +1,289 @@
+---
+title: "Configuration"
+description: "Configure environment variables and server settings for the LoL Tracker Backend"
+icon: "gear"
+---
+
+## Environment Variables
+
+The LoL Tracker Backend uses environment variables to manage sensitive configuration data. All environment variables are stored in a `.env` file and loaded using the **dotenv** package.
+
+### Loading Environment Variables
+
+At the top of `index.js`, environment variables are loaded:
+
+```javascript index.js
+require('dotenv').config();
+```
+
+<Note>
+  This line **must** be called before accessing any `process.env` variables to ensure they're loaded correctly.
+</Note>
+
+### Required Variables
+
+<ParamField path="RIOT_API_KEY" type="string" required>
+  Your Riot Games Developer API key. This is used to authenticate all requests to the Riot Games API.
+  
+  **How to set it:**
+  ```bash .env
+  RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+  ```
+
+  **How it's used in the code:**
+  ```javascript index.js
+  const apiKey = process.env.RIOT_API_KEY;
+  ```
+</ParamField>
+
+<Warning>
+  The `.env` file is included in `.gitignore` to prevent accidental exposure of your API key. Never commit this file to version control.
+</Warning>
+
+## Server Configuration
+
+The server configuration is defined in `index.js` and controls how the Express application runs.
+
+### Port Configuration
+
+The server listens on port 3000 by default:
+
+```javascript index.js
+const PORT = 3000;
+
+app.listen(PORT, () => {
+    console.log(`Servidor corriendo en http://localhost:${PORT}`);
+});
+```
+
+<Accordion title="How to change the port">
+  To run the server on a different port, modify the `PORT` constant:
+
+  ```javascript index.js
+  const PORT = 8080; // Change to your desired port
+  ```
+
+  Or make it configurable via environment variables:
+  
+  ```javascript index.js
+  const PORT = process.env.PORT || 3000;
+  ```
+
+  Then add to `.env`:
+  ```bash .env
+  PORT=8080
+  RIOT_API_KEY=your_key_here
+  ```
+</Accordion>
+
+### CORS Configuration
+
+The server uses the **cors** middleware to handle Cross-Origin Resource Sharing:
+
+```javascript index.js
+const cors = require('cors');
+app.use(cors());
+```
+
+**Current behavior:** Allows requests from **any origin** (suitable for development).
+
+<Tabs>
+  <Tab title="Development">
+    Default configuration allows all origins:
+    
+    ```javascript index.js
+    app.use(cors());
+    ```
+    
+    This is perfect for local development when your frontend and backend are on different ports.
+  </Tab>
+  
+  <Tab title="Production">
+    For production, restrict to specific origins:
+    
+    ```javascript index.js
+    app.use(cors({
+      origin: 'https://your-frontend-domain.com',
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'DELETE'],
+      allowedHeaders: ['Content-Type', 'Authorization']
+    }));
+    ```
+    
+    Or allow multiple origins:
+    
+    ```javascript index.js
+    const allowedOrigins = [
+      'https://your-frontend.com',
+      'https://www.your-frontend.com'
+    ];
+    
+    app.use(cors({
+      origin: function(origin, callback) {
+        if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+          callback(null, true);
+        } else {
+          callback(new Error('Not allowed by CORS'));
+        }
+      }
+    }));
+    ```
+  </Tab>
+</Tabs>
+
+### JSON Body Parser
+
+The server is configured to parse JSON request bodies:
+
+```javascript index.js
+app.use(express.json());
+```
+
+This middleware enables the server to automatically parse incoming JSON payloads in request bodies, making the data available in `req.body`.
+
+## API Request Configuration
+
+The backend uses **axios** for making HTTP requests to the Riot Games API.
+
+### Axios Configuration
+
+Every request to the Riot API includes authentication headers:
+
+```javascript index.js
+const apiKey = process.env.RIOT_API_KEY;
+
+const usuario = await axios.get(
+    `https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombre}/${tag}`,
+    { headers: { 'X-Riot-Token': apiKey } }
+);
+```
+
+**Key configuration elements:**
+- **Base URL**: Different Riot API endpoints use different regional URLs (`americas`, `la2`, etc.)
+- **Headers**: All requests include `X-Riot-Token` header with the API key
+- **Authentication**: API key is loaded from `process.env.RIOT_API_KEY`
+
+### Regional Endpoints Used
+
+The application connects to multiple Riot API regions:
+
+<CodeGroup>
+```javascript Americas (Account Data)
+https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/${nombre}/${tag}
+```
+
+```javascript LA2 (Summoner Data)
+https://la2.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${miPuuid}
+```
+
+```javascript LA2 (League Data)
+https://la2.api.riotgames.com/lol/league/v4/entries/by-puuid/${miPuuid}
+```
+
+```javascript Americas (Match History)
+https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/${miPuuid}/ids
+```
+</CodeGroup>
+
+## Configuration Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="shield">
+    - Never hardcode API keys in source code
+    - Always use `.env` for sensitive data
+    - Keep `.env` in `.gitignore`
+    - Use different API keys for dev/prod
+  </Card>
+  
+  <Card title="Performance" icon="gauge">
+    - Implement request caching for frequently accessed data
+    - Use connection pooling for database connections
+    - Enable compression middleware for responses
+    - Monitor API rate limits
+  </Card>
+  
+  <Card title="Error Handling" icon="bug">
+    - Implement global error handler middleware
+    - Log errors to monitoring service
+    - Return user-friendly error messages
+    - Never expose internal errors to clients
+  </Card>
+  
+  <Card title="Environment Management" icon="layer-group">
+    - Create separate `.env.development` and `.env.production`
+    - Document all required environment variables
+    - Validate env vars on server startup
+    - Use defaults for non-sensitive config
+  </Card>
+</CardGroup>
+
+## Example .env File
+
+Create a `.env` file in your project root with the following structure:
+
+```bash .env
+# Riot Games API Configuration
+RIOT_API_KEY=RGAPI-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+
+# Server Configuration (optional)
+PORT=3000
+NODE_ENV=development
+
+# CORS Configuration (optional)
+ALLOWED_ORIGINS=http://localhost:5173,http://localhost:3001
+```
+
+<Tip>
+  Create a `.env.example` file (without real values) to commit to your repository as a template:
+  
+  ```bash .env.example
+  RIOT_API_KEY=your_riot_api_key_here
+  PORT=3000
+  ```
+</Tip>
+
+## Verifying Configuration
+
+To verify your configuration is working correctly:
+
+<Steps>
+  <Step title="Check environment variables are loaded">
+    Add a console.log to verify (remove after testing):
+    
+    ```javascript
+    console.log('API Key loaded:', process.env.RIOT_API_KEY ? 'Yes' : 'No');
+    ```
+  </Step>
+  
+  <Step title="Test the root endpoint">
+    ```bash
+    curl http://localhost:3000
+    ```
+    
+    Should return:
+    ```
+    ¡El servidor del LoL Tracker está vivo, Guillote!
+    ```
+  </Step>
+  
+  <Step title="Test API key authentication">
+    Try a real API request:
+    
+    ```bash
+    curl http://localhost:3000/api/jugador/Faker/KR1
+    ```
+    
+    If configured correctly, you'll get player data. If not, you'll see an error.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication Guide" icon="key" href="/guides/authentication">
+    Learn how to obtain and use Riot API keys
+  </Card>
+  <Card title="API Overview" icon="book" href="/api/overview">
+    Explore all available endpoints and their usage
+  </Card>
+</CardGroup>

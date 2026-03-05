@@ -1,0 +1,211 @@
+---
+title: "Installation & Setup"
+description: "Complete guide to installing and setting up the LoL Tracker Backend locally"
+icon: "rocket"
+---
+
+## Prerequisites
+
+Before you begin, ensure you have the following installed on your system:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    Version 14.x or higher recommended
+  </Card>
+  <Card title="npm" icon="box">
+    Comes bundled with Node.js
+  </Card>
+</CardGroup>
+
+<Tip>
+  To check your current Node.js version, run `node --version` in your terminal.
+</Tip>
+
+## Installation Steps
+
+<Steps>
+  <Step title="Clone the Repository">
+    First, clone the LoL Tracker Backend repository to your local machine:
+
+    ```bash
+    git clone https://github.com/ValentinSetti/tracker-lol-backend.git
+    cd tracker-lol-backend
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required npm packages using the package manager:
+
+    ```bash
+    npm install
+    ```
+
+    This will install the following dependencies:
+    - **express** (v5.2.1) - Web framework for Node.js
+    - **axios** (v1.13.5) - HTTP client for making API requests
+    - **cors** (v2.8.6) - Middleware for enabling CORS
+    - **dotenv** (v17.3.1) - Environment variable management
+
+    <Note>
+      All dependencies are listed in `package.json` and will be installed automatically.
+    </Note>
+  </Step>
+
+  <Step title="Configure Environment Variables">
+    Create a `.env` file in the root directory of the project:
+
+    ```bash
+    touch .env
+    ```
+
+    Add your Riot Games API key to the `.env` file:
+
+    ```bash .env
+    RIOT_API_KEY=your_riot_api_key_here
+    ```
+
+    <Warning>
+      Never commit your `.env` file to version control. It's already included in `.gitignore` to prevent accidental exposure of your API key.
+    </Warning>
+
+    To obtain a Riot Games API key, visit [Riot Developer Portal](https://developer.riotgames.com/) and sign in with your Riot account.
+  </Step>
+
+  <Step title="Start the Server">
+    Launch the development server:
+
+    ```bash
+    node index.js
+    ```
+
+    You should see the following output:
+
+    ```bash
+    Servidor corriendo en http://localhost:3000
+    ```
+  </Step>
+
+  <Step title="Verify Installation">
+    Test that the server is running correctly by visiting the root endpoint:
+
+    ```bash
+    curl http://localhost:3000
+    ```
+
+    Expected response:
+    ```
+    ¡El servidor del LoL Tracker está vivo, Guillote!
+    ```
+
+    <Tip>
+      You can also open `http://localhost:3000` in your web browser to see this message.
+    </Tip>
+  </Step>
+</Steps>
+
+## Server Configuration
+
+The server is configured in `index.js` with the following settings:
+
+```javascript index.js
+const express = require('express');
+const cors = require('cors');
+const axios = require('axios'); 
+require('dotenv').config();
+
+const app = express();
+const PORT = 3000;
+
+app.use(cors());
+app.use(express.json());
+```
+
+### What Each Line Does:
+
+- **Line 1-3**: Import required dependencies (Express, CORS, Axios)
+- **Line 4**: Load environment variables from `.env` file using dotenv
+- **Line 6**: Initialize Express application
+- **Line 7**: Set the server port to 3000
+- **Line 9**: Enable CORS to allow cross-origin requests from frontend applications
+- **Line 10**: Enable JSON body parsing for incoming requests
+
+## Common Setup Issues
+
+<AccordionGroup>
+  <Accordion title="Port 3000 is already in use">
+    If you see an error that port 3000 is already in use:
+
+    **Solution 1**: Change the port in `index.js`:
+    ```javascript
+    const PORT = 3001; // or any available port
+    ```
+
+    **Solution 2**: Kill the process using port 3000:
+    ```bash
+    # On Linux/Mac
+    lsof -ti:3000 | xargs kill -9
+
+    # On Windows
+    netstat -ano | findstr :3000
+    taskkill /PID <PID> /F
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    If you encounter module import errors:
+
+    1. Delete `node_modules` and reinstall:
+    ```bash
+    rm -rf node_modules
+    npm install
+    ```
+
+    2. Clear npm cache:
+    ```bash
+    npm cache clean --force
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="RIOT_API_KEY not found">
+    If you see API key related errors:
+
+    1. Ensure `.env` file exists in the root directory
+    2. Verify the `.env` file contains: `RIOT_API_KEY=your_key_here`
+    3. Restart the server after creating/modifying `.env`
+    4. Check that `require('dotenv').config()` is called at the top of `index.js`
+  </Accordion>
+
+  <Accordion title="CORS errors in browser">
+    If you're getting CORS errors when connecting from a frontend:
+
+    The server already has CORS enabled by default:
+    ```javascript
+    app.use(cors());
+    ```
+
+    This allows requests from any origin. For production, you should restrict origins:
+    ```javascript
+    app.use(cors({
+      origin: 'https://your-frontend-domain.com'
+    }));
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="gear" href="/guides/configuration">
+    Learn about environment variables and server configuration
+  </Card>
+  <Card title="Authentication" icon="key" href="/guides/authentication">
+    Set up Riot API authentication and understand rate limits
+  </Card>
+  <Card title="API Endpoints" icon="code" href="/api/overview">
+    Explore available API endpoints
+  </Card>
+  <Card title="Quick Start" icon="bolt" href="/quickstart">
+    Make your first API request
+  </Card>
+</CardGroup>

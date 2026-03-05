@@ -1,0 +1,217 @@
+---
+title: "Welcome to LoL Tracker Backend"
+description: "A powerful REST API for tracking League of Legends player statistics, ranks, and match history"
+mode: "custom"
+---
+
+<div className="relative overflow-hidden py-20 bg-gradient-to-br from-[#0f1117] via-[#1a1d27] to-[#0f1117]">
+  <div className="max-w-6xl mx-auto px-6 text-center">
+    <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
+      Track League of Legends Stats with Ease
+    </h1>
+    <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-10">
+      A REST API built with Node.js and Express that provides real-time player statistics, ranked data, and detailed match history using the official Riot Games API
+    </p>
+    <div className="flex flex-wrap gap-4 justify-center">
+      <a 
+        href="/quickstart" 
+        className="inline-block px-8 py-3 rounded-lg bg-[#7c7c7c] text-white font-semibold hover:bg-[#8c8c8c] transition-colors no-underline"
+      >
+        Get Started
+      </a>
+      <a 
+        href="/api/overview" 
+        className="inline-block px-8 py-3 rounded-lg border border-white/30 bg-white/10 text-white font-semibold hover:border-[#7c7c7c] hover:bg-white/20 transition-colors no-underline"
+      >
+        API Reference
+      </a>
+    </div>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+      Quick Start
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Get your API server running in just a few minutes
+    </p>
+  </div>
+
+  <Steps>
+    <Step title="Clone the repository">
+      Start by cloning the project from GitHub to your local machine.
+      
+      ```bash
+      git clone https://github.com/ValentinSetti/tracker-lol-backend.git
+      cd tracker-lol-backend
+      ```
+    </Step>
+    
+    <Step title="Install dependencies">
+      Install all required Node.js packages using npm.
+      
+      ```bash
+      npm install
+      ```
+    </Step>
+    
+    <Step title="Set up your Riot API key">
+      Create a `.env` file in the project root and add your Riot Games developer API key. You can obtain one from the [Riot Developer Portal](https://developer.riotgames.com/).
+      
+      ```bash .env
+      RIOT_API_KEY=your_api_key_here
+      ```
+      
+      <Warning>
+        Keep your API key secure and never commit it to version control. The `.env` file is already included in `.gitignore`.
+      </Warning>
+    </Step>
+    
+    <Step title="Start the server">
+      Launch the API server on port 3000.
+      
+      ```bash
+      node index.js
+      ```
+      
+      You should see the message: `Servidor corriendo en http://localhost:3000`
+    </Step>
+    
+    <Step title="Make your first request">
+      Test the API by fetching player statistics. Replace `PlayerName` and `TAG` with an actual Riot ID.
+      
+      ```bash
+      curl http://localhost:3000/api/jugador/PlayerName/TAG
+      ```
+      
+      <Accordion title="Example response">
+        ```json
+        {
+          "userTier": "PLATINUM",
+          "userRank": "II",
+          "userLps": 45,
+          "userWins": 67,
+          "userLosses": 52,
+          "userLevel": 184,
+          "userPic": 4923,
+          "userId": "abc123def456..."
+        }
+        ```
+      </Accordion>
+    </Step>
+  </Steps>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+      Key Features
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Everything you need to build a League of Legends stats tracker
+    </p>
+  </div>
+
+  <CardGroup cols={2}>
+    <Card title="Player Profile & Rank" icon="user" href="/api/player">
+      Fetch player level, profile icon, rank tier, LP, wins, losses, and calculated winrate for Solo/Duo queue
+    </Card>
+    <Card title="Match History" icon="clock-rotate-left" href="/api/match-history">
+      Retrieve paginated match history with detailed game data, KDA, items, and team statistics
+    </Card>
+    <Card title="Multiple Queue Support" icon="gamepad" href="/api/overview">
+      Support for Ranked Solo/Duo, Normal games, ARAM, Clash, and Flexible queue types
+    </Card>
+    <Card title="Real-time Data" icon="bolt" href="/guides/authentication">
+      Direct integration with Riot Games API for live player statistics and match information
+    </Card>
+  </CardGroup>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="text-center mb-12">
+    <h2 className="text-3xl font-semibold text-gray-900 dark:text-white mb-3">
+      Explore the Documentation
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400">
+      Learn how to integrate and customize the API for your needs
+    </p>
+  </div>
+
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <a href="/guides/setup" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] overflow-hidden transition-colors no-underline">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span>Setup Guide</span>
+          <svg className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#7c7c7c] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Complete installation and configuration instructions for local development
+        </p>
+      </div>
+    </a>
+
+    <a href="/guides/authentication" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] overflow-hidden transition-colors no-underline">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span>Riot API Authentication</span>
+          <svg className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#7c7c7c] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Learn how to obtain and securely manage your Riot Games API key
+        </p>
+      </div>
+    </a>
+
+    <a href="/api/player" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] overflow-hidden transition-colors no-underline">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span>Player Endpoint</span>
+          <svg className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#7c7c7c] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Fetch player statistics, rank information, and profile data
+        </p>
+      </div>
+    </a>
+
+    <a href="/api/match-history" className="group block rounded-2xl border border-gray-200 dark:border-[#27272a] hover:border-[#7c7c7c] dark:hover:border-[#7c7c7c] overflow-hidden transition-colors no-underline">
+      <div className="p-6">
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-2 flex items-center gap-2">
+          <span>Match History Endpoint</span>
+          <svg className="w-4 h-4 text-gray-600 dark:text-gray-400 group-hover:text-[#7c7c7c] transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
+        </h3>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Retrieve detailed match history with pagination and game statistics
+        </p>
+      </div>
+    </a>
+  </div>
+</div>
+
+<div className="mt-16 mb-16 max-w-5xl mx-auto px-6">
+  <div className="rounded-2xl border border-gray-200 dark:border-[#27272a] bg-gray-50 dark:bg-[#1a1d27] p-8 text-center">
+    <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
+      Ready to start tracking?
+    </h2>
+    <p className="text-base text-gray-600 dark:text-gray-400 mb-6 max-w-2xl mx-auto">
+      Follow the quickstart guide to get your API server running in minutes
+    </p>
+    <a 
+      href="/quickstart" 
+      className="inline-block px-8 py-3 rounded-lg bg-[#7c7c7c] text-white font-semibold hover:bg-[#8c8c8c] transition-colors no-underline"
+    >
+      Get Started Now
+    </a>
+  </div>
+</div>

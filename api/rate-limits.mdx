@@ -1,0 +1,418 @@
+---
+title: "Rate Limits"
+description: "Understanding Riot API rate limits and how to optimize your requests"
+---
+
+## Overview
+
+The LoL Tracker API is a **proxy service** that forwards requests to the Riot Games API. This means **Riot's rate limits apply directly to your usage** of this backend.
+
+<Warning>
+Every request to the LoL Tracker backend counts against your Riot API rate limit. The backend does not implement caching, so repeated requests will consume your rate limit quota quickly.
+</Warning>
+
+## Riot API Rate Limit Tiers
+
+Riot Games enforces different rate limits based on your API key type:
+
+### Development Keys
+
+**Free tier for testing and development**
+
+| Limit Type | Allowance |
+|------------|----------|
+| Requests per second | 20 requests |
+| Requests per 2 minutes | 100 requests |
+| Key duration | 24 hours (expires daily) |
+
+<Note>
+Development keys expire after 24 hours. You must regenerate them daily from the [Riot Developer Portal](https://developer.riotgames.com/).
+</Note>
+
+### Production Keys
+
+**Approved for live applications**
+
+| Limit Type | Allowance |
+|------------|----------|
+| Requests per second | Varies (typically 500+) |
+| Requests per 2 minutes | Varies (typically 30,000+) |
+| Key duration | Does not expire |
+| Requirements | Application approval from Riot |
+
+<Warning>
+Production keys require an application review process. Apply at the [Riot Developer Portal](https://developer.riotgames.com/) with details about your use case.
+</Warning>
+
+## How Rate Limits Apply to This API
+
+### Player Endpoint Rate Limit Impact
+
+The `/api/jugador/:nombre/:tag` endpoint makes **3 sequential requests** to Riot API:
+
+1. **Account lookup** (`index.js:26-29`)
+   ```
+   GET https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{nombre}/{tag}
+   ```
+
+2. **Summoner profile** (`index.js:34-37`)
+   ```
+   GET https://la2.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/{puuid}
+   ```
+
+3. **Ranked stats** (`index.js:43-46`)
+   ```
+   GET https://la2.api.riotgames.com/lol/league/v4/entries/by-puuid/{puuid}
+   ```
+
+**Total: 3 requests per player lookup**
+
+### Match History Endpoint Rate Limit Impact
+
+The `/api/historial/:nombre/:tag` endpoint is **much more expensive** on rate limits:
+
+1. **Account lookup** (`index.js:76-83`)
+   ```
+   GET https://americas.api.riotgames.com/riot/account/v1/accounts/by-riot-id/{nombre}/{tag}
+   ```
+
+2. **Match ID list** (`index.js:89-96`)
+   ```
+   GET https://americas.api.riotgames.com/lol/match/v5/matches/by-puuid/{puuid}/ids
+   ```
+
+3. **Match details** (`index.js:104-107`) - **One request per match**
+   ```
+   GET https://americas.api.riotgames.com/lol/match/v5/matches/{matchId}
+   ```
+   This runs in a loop for each match returned
+
+**Total: 2 + N requests** (where N = number of matches requested)
+
+<Accordion title="Example: Fetching 10 matches">
+If you request 10 matches with `?cantidad=10`:
+- 1 request for account lookup
+- 1 request for match ID list
+- 10 requests for individual match details
+- **Total: 12 requests to Riot API**
+
+With a development key limit of 20 requests/second, fetching 10 matches for just 2 different players would exceed your per-second limit.
+</Accordion>
+
+## Rate Limit Response
+
+When you exceed Riot's rate limits, you'll receive a `429 Too Many Requests` response from Riot API.
+
+**What happens in the code**:
+- Riot returns 429 status
+- The backend catches it at `index.js:201-203`
+- You receive a 500 error: `{"error": "Hubo un problema al buscar al jugador."}`
+
+**Server console shows**:
+```
+Error consultando a Riot: { status: 429, message: "Rate limit exceeded" }
+```
+
+<Warning>
+The 429 response from Riot is not distinguished from other errors in the client response. You must check server logs to confirm rate limiting.
+</Warning>
+
+## Pagination as a Rate Limiting Strategy
+
+The match history endpoint supports pagination to control request volume:
+
+### Query Parameters
+
+| Parameter | Default | Description | Defined At |
+|-----------|---------|-------------|------------|
+| `inicio` | `0` | Starting index (offset) | `index.js:86` |
+| `cantidad` | `10` | Number of matches to retrieve | `index.js:87` |
+
+**Example usage**:
+```bash
+# Get first 5 matches (6 total requests to Riot)
+GET /api/historial/Faker/KR1?inicio=0&cantidad=5
+
+# Get next 5 matches (6 more requests)
+GET /api/historial/Faker/KR1?inicio=5&cantidad=5
+
+# Get 20 matches at once (22 total requests - may hit rate limit!)
+GET /api/historial/Faker/KR1?cantidad=20
+```
+
+<Note>
+**Pagination strategy**: Request smaller batches of matches (5-10) to stay within rate limits. Load more as needed rather than fetching everything upfront.
+</Note>
+
+## Best Practices for Staying Within Limits
+
+### 1. Implement Client-Side Caching
+
+Since the backend doesn't cache responses, implement caching in your frontend:
+
+```javascript
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+const cachedFetch = async (url) => {
+  const cached = localStorage.getItem(url);
+  if (cached) {
+    const { data, timestamp } = JSON.parse(cached);
+    if (Date.now() - timestamp < CACHE_DURATION) {
+      return data;
+    }
+  }
+  
+  const response = await fetch(url);
+  const data = await response.json();
+  
+  localStorage.setItem(url, JSON.stringify({
+    data,
+    timestamp: Date.now()
+  }));
+  
+  return data;
+};
+```
+
+**Why this helps**:
+- Player stats don't change instantly
+- Match history is immutable (completed games don't change)
+- Reduces redundant API calls
+
+### 2. Request Smaller Match Batches
+
+**Bad approach** (22 requests):
+```javascript
+// Fetches 20 matches = 22 Riot API requests
+fetch('/api/historial/Player/TAG?cantidad=20')
+```
+
+**Good approach** (7 requests initially, load more on demand):
+```javascript
+// Fetch 5 matches initially = 7 Riot API requests
+const initialMatches = await fetch('/api/historial/Player/TAG?cantidad=5');
+
+// Load more only when user scrolls/clicks
+const loadMore = () => {
+  const nextMatches = await fetch(
+    `/api/historial/Player/TAG?inicio=${matches.length}&cantidad=5`
+  );
+};
+```
+
+### 3. Handle 429 Responses with Retry Logic
+
+Implement exponential backoff when rate limited:
+
+```javascript
+const fetchWithRetry = async (url, maxRetries = 3) => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const response = await fetch(url);
+      
+      if (response.ok) {
+        return await response.json();
+      }
+      
+      // Check server logs to confirm it's a 429
+      if (response.status === 500) {
+        // Wait before retrying: 1s, 2s, 4s
+        await new Promise(resolve => 
+          setTimeout(resolve, Math.pow(2, i) * 1000)
+        );
+        continue;
+      }
+      
+      throw new Error('Request failed');
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+    }
+  }
+};
+```
+
+### 4. Debounce User Input
+
+Prevent excessive API calls from rapid user actions:
+
+```javascript
+let searchTimeout;
+
+const handleSearchInput = (playerName) => {
+  clearTimeout(searchTimeout);
+  
+  searchTimeout = setTimeout(() => {
+    // Only fetch after user stops typing for 500ms
+    fetchPlayerStats(playerName);
+  }, 500);
+};
+```
+
+### 5. Monitor Your Rate Limit Usage
+
+Riot includes rate limit headers in responses:
+
+```
+X-App-Rate-Limit: 20:1,100:120
+X-App-Rate-Limit-Count: 5:1,15:120
+```
+
+<Note>
+These headers are not currently exposed by the LoL Tracker backend. Consider modifying the backend to forward these headers to help monitor your usage.
+</Note>
+
+## Optimization Tips
+
+### Reduce Match History Requests
+
+The match history loop (`index.js:102-196`) makes one API call **per match**. To optimize:
+
+1. **Start with fewer matches**
+   - Default `cantidad=10` means 12 requests
+   - Consider reducing to `cantidad=5` (7 requests)
+
+2. **Implement infinite scroll** instead of loading all matches
+   - Load 5 matches initially
+   - Load 5 more when user scrolls to bottom
+   - Users rarely view more than 10-15 matches
+
+3. **Cache match details**
+   - Match data never changes once the game is complete
+   - Cache aggressively (days or weeks)
+
+### Be Strategic About Player Lookups
+
+Each player lookup costs 3 requests:
+
+```javascript
+// Bad: Looking up the same player multiple times
+await fetch('/api/jugador/Faker/KR1');
+// ... later in code ...
+await fetch('/api/jugador/Faker/KR1'); // 3 more wasted requests!
+
+// Good: Cache player data
+const playerCache = new Map();
+const getPlayer = async (name, tag) => {
+  const key = `${name}#${tag}`;
+  if (playerCache.has(key)) {
+    return playerCache.get(key);
+  }
+  
+  const data = await fetch(`/api/jugador/${name}/${tag}`);
+  playerCache.set(key, data);
+  return data;
+};
+```
+
+## Rate Limit Scenarios
+
+### Scenario 1: Multiple Player Searches
+
+**User action**: Search for 10 different players rapidly
+
+**API calls**: 10 players × 3 requests = 30 requests
+
+**Result with Development Key**:
+- ✅ Within 20/second limit if searches happen over 2+ seconds
+- ❌ Exceeds limit if all searches happen instantly
+
+**Solution**: Implement debouncing or show "searching..." state between requests
+
+### Scenario 2: Loading Match History
+
+**User action**: View match history for one player (default 10 matches)
+
+**API calls**: 2 + 10 = 12 requests
+
+**Result with Development Key**:
+- ✅ Within 20/second limit
+- ⚠️ But only 8 more requests available in that second
+
+**Solution**: No immediate issue, but be careful about additional operations in the same second
+
+### Scenario 3: Multiple Users Simultaneously
+
+**User action**: 5 users each search for a player at the same time
+
+**API calls**: 5 users × 3 requests = 15 requests
+
+**Result with Development Key**:
+- ✅ Within 20/second limit
+- ⚠️ But approaching the limit quickly
+
+**Solution**: Implement backend caching to serve repeated requests without hitting Riot API
+
+### Scenario 4: Power User Loading Many Matches
+
+**User action**: Load 50 matches for one player
+
+**API calls**: 2 + 50 = 52 requests
+
+**Result with Development Key**:
+- ❌ Exceeds 20/second limit
+- ❌ Exceeds 100/2-minute limit if done twice
+
+**Solution**: 
+- Limit `cantidad` parameter to maximum of 10-15
+- Use pagination to load additional matches on demand
+- Add rate limiting on the backend to spread requests over time
+
+<Warning>
+**Critical limitation**: The current implementation (`index.js:102-196`) makes all match detail requests **sequentially in a loop** without any delay. Large `cantidad` values will trigger rate limits.
+</Warning>
+
+## Monitoring Rate Limits
+
+### Check Server Logs
+
+Watch for 429 errors in the console:
+
+```bash
+Error consultando a Riot: { status: 429, message: "Rate limit exceeded" }
+```
+
+### Track Request Patterns
+
+The server logs each player search:
+
+```bash
+--- NUEVA BÚSQUEDA: PlayerName #TAG ---
+```
+
+Monitor these logs to identify heavy usage patterns.
+
+### Riot Developer Portal
+
+Visit the [Riot Developer Portal](https://developer.riotgames.com/) to:
+- View your current API key tier
+- Monitor rate limit violations
+- Apply for production API keys
+- Check API status and uptime
+
+## Upgrading to Production Keys
+
+If you're consistently hitting development key limits, consider applying for a production key:
+
+**Requirements**:
+1. Clear use case and application description
+2. Demonstrated responsible API usage
+3. Implementation of rate limiting and caching
+4. Terms of Service compliance
+
+**Benefits**:
+- 25x-50x higher rate limits
+- Non-expiring API keys
+- Priority support
+- Production-ready reliability
+
+**Application process**:
+1. Visit [Riot Developer Portal](https://developer.riotgames.com/)
+2. Navigate to "App Registration"
+3. Submit detailed application
+4. Wait 1-2 weeks for review
+
+## Related Resources
+
+- [Response Codes & Error Handling](/api/response-codes) - Understanding API errors including 429 responses
+- [Match History Endpoint](/api/match-history) - Using pagination parameters
+- [Riot API Documentation](https://developer.riotgames.com/docs/lol) - Official rate limit documentation

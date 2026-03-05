@@ -1,0 +1,141 @@
+---
+title: 'API Overview'
+description: 'Overview of the LoL Tracker REST API endpoints and usage patterns'
+---
+
+## Base URL
+
+The API runs locally on:
+
+```
+http://localhost:3000
+```
+
+## Authentication
+
+All API endpoints require a Riot Games API key for authentication. The key must be provided in the request headers:
+
+```bash
+X-Riot-Token: YOUR_RIOT_API_KEY
+```
+
+<Note>
+The API uses the Riot Games API key stored in the server's environment variables (`RIOT_API_KEY`). Client requests don't need to provide the key directly - the server handles authentication with Riot's services.
+</Note>
+
+## Response Format
+
+All endpoints return JSON-formatted responses.
+
+### Success Responses
+
+Successful requests return status code `200` with the requested data in JSON format.
+
+### Error Responses
+
+Errors return status code `500` with the following structure:
+
+```json
+{
+  "error": "Hubo un problema al buscar al jugador."
+}
+```
+
+## Available Endpoints
+
+The LoL Tracker API provides two main endpoints:
+
+<CardGroup cols={2}>
+  <Card title="Get Player Statistics" icon="user" href="/api/player">
+    Retrieve ranked statistics and profile information for a League of Legends player
+  </Card>
+  <Card title="Get Match History" icon="clock-rotate-left" href="/api/match-history">
+    Fetch detailed match history with game statistics and participant information
+  </Card>
+</CardGroup>
+
+## Endpoints Quick Reference
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/jugador/:nombre/:tag` | GET | Get player statistics including rank, wins, losses, and level |
+| `/api/historial/:nombre/:tag` | GET | Get match history with detailed game information (supports pagination) |
+
+## Common Patterns
+
+### Player Identification
+
+Both endpoints use Riot ID format for player identification:
+
+- **nombre**: The player's in-game name
+- **tag**: The player's tagline (without the # symbol)
+
+**Example:**
+```bash
+# For player "Faker#KR1"
+GET /api/jugador/Faker/KR1
+```
+
+### Regional Routing
+
+The API uses the following Riot Games regional endpoints:
+
+- **Americas** (`americas.api.riotgames.com`): Account data and match history
+- **LA2** (`la2.api.riotgames.com`): Latin America summoner and league data
+
+### Queue Types
+
+The API tracks the following queue types:
+
+| Queue ID | Queue Name |
+|----------|------------|
+| 420 | Clasificatoria Solo/Dúo |
+| 400 | Normal Reclutamiento |
+| 430 | Normal Selección Oculta |
+| 440 | Clasificatoria Flexible |
+| 450 | ARAM |
+| 700 | Clash |
+
+### Data Processing
+
+- **Rank Information**: Player endpoint filters for Solo/Duo ranked queue (`RANKED_SOLO_5x5`)
+- **Match Duration**: Converted from seconds to `MM:SS` format
+- **Team IDs**: Team Blue = `100`, Team Red = `200`
+- **Unranked Players**: Returns `"UNRANKED"` tier with `0` LP, wins, and losses
+
+## Rate Limiting
+
+<Warning>
+This API is subject to Riot Games API rate limits. The server may return errors if rate limits are exceeded.
+</Warning>
+
+## CORS
+
+The API has CORS enabled and accepts requests from all origins.
+
+## Example Usage
+
+### Get Player Stats
+
+```bash
+curl http://localhost:3000/api/jugador/HideOnBush/KR1
+```
+
+### Get Recent Matches
+
+```bash
+curl http://localhost:3000/api/historial/HideOnBush/KR1?inicio=0&cantidad=5
+```
+
+## Status Check
+
+You can verify the server is running by accessing the root endpoint:
+
+```bash
+GET http://localhost:3000/
+```
+
+**Response:**
+```
+¡El servidor del LoL Tracker está vivo, Guillote!
+```
